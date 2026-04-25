@@ -1,5 +1,6 @@
 const express = require("express");
 const { connectQueue, publishOrderCreated } = require("./publisher");
+const { startOrderConsumer } = require("./consumer");
 const { getUser } = require("./grpcClient");
 
 const app = express();
@@ -41,5 +42,6 @@ app.get("/orders", (req, res) => {
 
 app.listen(3000, async () => {
   await connectQueue();
+  await startOrderConsumer(orders);
   console.log("Order Service running on port 3000");
 });

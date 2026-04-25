@@ -6,6 +6,8 @@ async function start() {
 
   const exchange = "order_events";
 
+  const processedEvents = new Set();
+
   // Create exchange (safe if already exists)
   await channel.assertExchange(exchange, "fanout", {
     durable: false,
@@ -26,16 +28,54 @@ async function start() {
     q.queue,
     (msg) => {
       if (msg !== null) {
-        const order = JSON.parse(msg.content.toString());
+        const event = JSON.parse(msg.content.toString());
 
-        console.log("💳 Payment Service received order:", order);
+        // 🔥 ONLY process OrderCreated
+        if (event.type !== "OrderCreated") {
+          return;
+        }
 
-        console.log("Processing payment for order:", order.id);
+        // 🔥 Idempotency check
+        if (processedEvents.has(event.eventId)) {
+          console.log("⚠️ Duplicate ignored:", event.eventId);
+          return;
+        }
 
-        // simulate processing
-        setTimeout(() => {
-          console.log("Payment completed for order:", order.id);
-        }, 1000);
+        processedEvents.add(event.eventId);
+
+        const order = event.data;
+
+        console.log("💳 Payment received order:", order.id);
+
+        const isSuccess = Math.random() > 0.5;
+
+        if (isSuccess) {
+          console.log("✅ Payment SUCCESS for order:", order.id);
+
+          channel.publish(
+            exchange,
+            "",
+            Buffer.from(
+              JSON.stringify({
+                type: "PaymentSuccess",
+                orderId: order.id,
+              }),
+            ),
+          );
+        } else {
+          console.log("❌ Payment FAILED for order:", order.id);
+
+          channel.publish(
+            exchange,
+            "",
+            Buffer.from(
+              JSON.stringify({
+                type: "PaymentFailed",
+                orderId: order.id,
+              }),
+            ),
+          );
+        }
       }
     },
     { noAck: true },

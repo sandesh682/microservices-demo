@@ -1,4 +1,5 @@
 const amqp = require("amqplib");
+const { randomUUID } = require("crypto");
 
 let channel;
 
@@ -11,9 +12,17 @@ async function connectQueue() {
 }
 
 function publishOrderCreated(order) {
-  const exchange = "order_events";
-  channel.publish(exchange, "", Buffer.from(JSON.stringify(order)));
-  console.log("Event Published: OrderCreated", order);
+  channel.publish(
+    "order_events",
+    "",
+    Buffer.from(
+      JSON.stringify({
+        eventId: randomUUID(),
+        type: "OrderCreated",
+        data: order,
+      }),
+    ),
+  );
 }
 
 module.exports = { connectQueue, publishOrderCreated };
