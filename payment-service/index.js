@@ -23,55 +23,68 @@ async function start() {
   // Bind queue to exchange
   await channel.bindQueue(q.queue, exchange, "");
 
-  // Consume messages
+  const MAX_RETRIES = 3;
+
   channel.consume(
     q.queue,
     (msg) => {
-      if (msg !== null) {
-        const event = JSON.parse(msg.content.toString());
+      if (!msg) return;
 
-        // 🔥 ONLY process OrderCreated
-        if (event.type !== "OrderCreated") {
-          return;
-        }
+      const event = JSON.parse(msg.content.toString());
 
-        // 🔥 Idempotency check
-        if (processedEvents.has(event.eventId)) {
-          console.log("⚠️ Duplicate ignored:", event.eventId);
-          return;
-        }
+      if (event.type !== "OrderCreated") return;
 
-        processedEvents.add(event.eventId);
+      const order = event.data;
 
-        const order = event.data;
+      console.log(
+        `💳 Processing order ${order.id}, retry: ${event.retryCount}`,
+      );
 
-        console.log("💳 Payment received order:", order.id);
+      const isSuccess = Math.random() > 0.7; // make failures more visible
 
-        const isSuccess = Math.random() > 0.5;
+      if (isSuccess) {
+        console.log("✅ Payment SUCCESS:", order.id);
 
-        if (isSuccess) {
-          console.log("✅ Payment SUCCESS for order:", order.id);
+        channel.publish(
+          "order_events",
+          "",
+          Buffer.from(
+            JSON.stringify({
+              eventId: event.eventId,
+              type: "PaymentSuccess",
+              data: { orderId: order.id },
+            }),
+          ),
+        );
+      } else {
+        console.log("❌ Payment FAILED:", order.id);
 
-          channel.publish(
-            exchange,
-            "",
-            Buffer.from(
-              JSON.stringify({
-                type: "PaymentSuccess",
-                orderId: order.id,
-              }),
-            ),
-          );
+        if (event.retryCount < MAX_RETRIES) {
+          console.log(`🔁 Retrying order ${order.id}...`);
+
+          setTimeout(() => {
+            channel.publish(
+              "order_events",
+              "",
+              Buffer.from(
+                JSON.stringify({
+                  ...event,
+                  retryCount: event.retryCount + 1, // 🔥 increment
+                }),
+              ),
+            );
+          }, 2000); // 2 sec delay
         } else {
-          console.log("❌ Payment FAILED for order:", order.id);
+          console.log("🚨 Max retries reached. Marking failed:", order.id);
 
           channel.publish(
-            exchange,
+            "order_events",
             "",
             Buffer.from(
               JSON.stringify({
+                eventId: event.eventId,
                 type: "PaymentFailed",
-                orderId: order.id,
+                data: { orderId: order.id },
               }),
             ),
           );

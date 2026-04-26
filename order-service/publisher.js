@@ -20,6 +20,7 @@ function publishOrderCreated(order) {
         eventId: randomUUID(),
         type: "OrderCreated",
         data: order,
+        retryCount: 0,
       }),
     ),
   );
