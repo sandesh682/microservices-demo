@@ -7,7 +7,7 @@ async function start() {
   const exchange = "order_events";
 
   await channel.assertExchange(exchange, "fanout", {
-    durable: false,
+    durable: true,
   });
 
   // Create its own queue (IMPORTANT)

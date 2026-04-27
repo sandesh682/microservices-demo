@@ -7,7 +7,7 @@ async function connectQueue() {
   const connection = await amqp.connect("amqp://localhost");
   channel = await connection.createChannel();
   const exchange = "order_events";
-  await channel.assertExchange(exchange, "fanout", { durable: false });
+  await channel.assertExchange(exchange, "fanout", { durable: true });
   console.log("Connected to RabbitMQ");
 }
 

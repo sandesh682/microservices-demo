@@ -9,7 +9,7 @@ async function startOrderConsumer(orders) {
 
   const processedEvents = new Set();
 
-  await channel.assertExchange(exchange, "fanout", { durable: false });
+  await channel.assertExchange(exchange, "fanout", { durable: true });
 
   const q = await channel.assertQueue("", { exclusive: true });
 
